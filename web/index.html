@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lagos Flood Radar 2017–2025</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* VOICE: a newspaper graphics desk explaining nine rainy seasons of radar evidence — sober, exact.
+   IDEA: a hydrographic survey sheet of the Lagos lagoon system, one sheet per rainy season.
+   PICTURE: the live map — lagoon water, LGA lines, and that year's flooded ground drawn over it.
+   COLOUR and TYPE: lagoon navy ground for the map, flood cyan, wetland green, one rust accent for recurrence; Public Sans.
+   LAYOUT: finding + key figures, then map (left) with a season rail; year bars, LGA ranking and exposure beside it; method below. */
+:root{color-scheme:light dark;
+  --bg:light-dark(#f4f6f7,#0b1419);--panel:light-dark(#ffffff,#121e25);--ink:light-dark(#0d1b22,#e6edf0);
+  --mute:light-dark(#566870,#93a6ae);--line:light-dark(#d5dde0,#243640);
+  --water:#0e3b53;--land:#00a6d6;--wet:#2f8f5b;--rust:#c8481e}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Public Sans",system-ui,sans-serif;overflow-x:clip}
+.band{padding:clamp(24px,3.5vw,48px) max(4vw,16px)}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:clamp(28px,3.6vw,44px);line-height:1.08;margin:0 0 12px;text-wrap:balance;font-weight:700;max-width:24ch}
+h2{font-size:20px;margin:0 0 10px;line-height:1.2}
+p{margin:0 0 12px;max-width:68ch}
+.lede{color:var(--mute);font-size:17px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:20px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.kpi b{display:block;font-size:clamp(24px,2.6vw,32px);line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--mute);font-size:14px}
+.grid{display:grid;grid-template-columns:minmax(0,1.75fr) minmax(0,1fr);gap:18px;align-items:start}
+.mapbox{background:var(--water);border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+#map{height:min(68vh,620px);min-height:380px;background:#0e3b53}
+.topbar{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:14px;padding:10px max(4vw,16px);border-bottom:1px solid var(--line);background:var(--panel)}
+.topbar a{color:var(--ink);text-decoration:none;font-weight:600}.topbar a span{color:var(--mute);font-weight:400}.topbar nav{display:flex;gap:16px}.topbar nav a{color:var(--mute);font-weight:500}
+.rail{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;padding:10px;background:var(--panel);border-top:1px solid var(--line);align-items:center}
+.rail button,.ctl{font:600 15px "Public Sans",sans-serif;min-height:44px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:0 14px;cursor:pointer;scroll-snap-align:start;flex:none}
+.rail button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--land);outline-offset:2px}
+.layers{display:flex;flex-wrap:wrap;gap:8px 16px;padding:10px 12px;background:var(--panel);border-top:1px solid var(--line);font-size:14px}
+.layers label{display:flex;align-items:center;gap:8px;min-height:32px;cursor:pointer}
+.layers input{width:18px;height:18px}
+.sw{display:inline-block;width:14px;height:14px;border-radius:3px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:18px}
+.bars{display:grid;gap:4px}
+.bar{display:grid;grid-template-columns:44px minmax(0,1fr) 72px;gap:8px;align-items:center;font-size:14px;background:none;border:0;color:inherit;padding:4px 2px;border-radius:6px;cursor:pointer;text-align:left;font-family:inherit;min-height:32px}
+.bar[aria-pressed=true]{background:light-dark(#e8f4f8,#173040)}
+.track{display:flex;height:14px;border-radius:3px;overflow:hidden;background:light-dark(#edf1f2,#1b2a32)}
+.track i{display:block;height:100%}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.legend{display:flex;gap:14px;font-size:13px;color:var(--mute);margin:8px 0 0;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left}
+th{font-size:13px;color:var(--mute);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.note{font-size:13px;color:var(--mute)}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.cols p,.cols li{font-size:15px}
+ul{margin:0;padding-left:18px}
+a{color:var(--land)}
+.leaflet-container{font:inherit}
+.leaflet-tooltip{font:13px "Public Sans",sans-serif}
+@media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.cols{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}#map{min-height:340px}table{font-size:13px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="topbar"><a href="https://progress-akpan-portfolio.vercel.app/" target="_top">Progress Peter Akpan <span>· GIS portfolio</span></a><nav><a href="https://progress-akpan-portfolio.vercel.app/projects/lagos-flood-radar/" target="_top">Project write-up</a><a href="https://progress-akpan-portfolio.vercel.app/#projects" target="_top">All projects</a></nav></div>
+<header class="band"><div class="wrap">
+  <h1>Radar finds 800–1,560 ha of flooded land in Lagos every rainy season, mostly in Epe, Ibeju‑Lekki and Badagry</h1>
+  <p class="lede">Sentinel‑1 radar sees through rain clouds. Comparing each rainy season (April–October) with that year's dry season shows where ground turned to standing water, 2017–2025. Wetland and mangrove flooding is mapped separately from flooding on land.</p>
+  <div class="kpis" id="kpis"></div>
+</div></header>
+
+<main class="band" style="padding-top:0"><div class="wrap grid">
+  <section>
+    <div class="mapbox">
+      <div id="map" role="img" aria-label="Map of Lagos State showing satellite-detected flooding for the selected year"></div>
+      <div class="rail" id="rail" aria-label="Choose a rainy season">
+        <button class="ctl" id="play" aria-label="Play through the years">▶ Play</button>
+      </div>
+      <div class="layers">
+        <label><input type="checkbox" id="tLand" checked><span class="sw" style="background:var(--land)"></span>Flooding on land</label>
+        <label><input type="checkbox" id="tWet" checked><span class="sw" style="background:var(--wet)"></span>Wetland / mangrove</label>
+        <label><input type="checkbox" id="tRec"><span class="sw" style="background:var(--rust)"></span>Years flooded, 2017–2025 (land)</label>
+      </div>
+    </div>
+    <p class="note" style="margin-top:8px">Hover a flooded area for its year and type. Detected area totals come from the full-resolution 20 m analysis; map outlines are simplified for the web.</p>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2>Flooded area by rainy season</h2>
+      <div class="bars" id="bars"></div>
+      <div class="legend"><span><i class="sw" style="background:var(--land)"></i> land</span><span><i class="sw" style="background:var(--wet)"></i> wetland / mangrove</span><span>hectares, total shown</span></div>
+    </div>
+    <div class="card">
+      <h2 id="lgaTitle">Where land flooded</h2>
+      <table><thead><tr><th>LGA</th><th class="n">Flooded land, ha</th></tr></thead><tbody id="lgaRows"></tbody></table>
+    </div>
+    <div class="card" id="expCard">
+      <h2 id="expTitle">People and buildings in flooded areas</h2>
+      <div id="expBody"><p class="note">Exposure figures are loading.</p></div>
+    </div>
+  </aside>
+</div></main>
+
+<section class="band" style="background:var(--panel);border-top:1px solid var(--line)"><div class="wrap cols">
+  <div>
+    <h2>How it was measured</h2>
+    <p>Sentinel‑1A radar (ascending track 1, the only track covering all of Lagos, 12‑day revisit every year). For each year, every April–October image is compared with that year's January–March median. A 20 m cell counts as flooded when its VH backscatter drops by more than 3 dB to below −20 dB in at least two images.</p>
+  </div>
+  <div>
+    <h2>What was removed</h2>
+    <ul>
+      <li>Permanent water (JRC Global Surface Water, ≥10 months a year) and ESA WorldCover open water</li>
+      <li>Bare and sand‑filled ground, which caused one‑off false detections at reclamation sites</li>
+      <li>Slopes above 5° and clusters smaller than 8 cells</li>
+    </ul>
+  </div>
+  <div>
+    <h2>Limits</h2>
+    <ul>
+      <li>Flash floods that drain within hours and water between buildings are mostly invisible to radar, so built‑up Lagos is under‑counted.</li>
+      <li>Exposure means people or buildings located inside detected flooding, not confirmed damage. A few small detections in dense neighbourhoods (Lagos Mainland 2025, Eti‑Osa 2024) carry most of the building counts and need ground checking.</li>
+      <li>2026 is excluded: only 8 rainy‑season images so far, against 17–18 in other years.</li>
+    </ul>
+  </div>
+</div>
+<div class="wrap" style="margin-top:20px"><p class="note">Data: Copernicus Sentinel‑1 GRD; JRC Global Surface Water v1.4; ESA WorldCover 2021; JRC GHS‑POP R2023A; Google Open Buildings 2.5D Temporal; GRIP4 roads; FAO GAUL 2015 boundaries. Processed in Google Earth Engine by Progress Peter Akpan.</p></div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+{
+// Statistics from Earth Engine script 03 (v2, 20 m analysis grid)
+const YEARS=[2017,2018,2019,2020,2021,2022,2023,2024,2025];
+const STATS={
+2017:{land:1096,wet:1641,lga:[["Ibeju Lekki",446],["Epe",388],["Badagry",141],["Eti-Osa",73],["Ojo",17]]},
+2018:{land:786,wet:3593,lga:[["Ibeju Lekki",294],["Epe",231],["Badagry",145],["Eti-Osa",36],["Kosofe",17]]},
+2019:{land:1191,wet:2849,lga:[["Epe",423],["Ibeju Lekki",410],["Badagry",243],["Kosofe",30],["Eti-Osa",23]]},
+2020:{land:1087,wet:1633,lga:[["Epe",378],["Ibeju Lekki",372],["Badagry",212],["Eti-Osa",48],["Ikorodu",26]]},
+2021:{land:1331,wet:2665,lga:[["Epe",670],["Ibeju Lekki",396],["Badagry",136],["Eti-Osa",46],["Ojo",14]]},
+2022:{land:1226,wet:2587,lga:[["Epe",623],["Ibeju Lekki",412],["Badagry",82],["Eti-Osa",36],["Ikorodu",21]]},
+2023:{land:927,wet:3420,lga:[["Epe",418],["Ibeju Lekki",326],["Badagry",116],["Eti-Osa",16],["Lagos Island",12]]},
+2024:{land:1169,wet:2629,lga:[["Epe",622],["Ibeju Lekki",400],["Badagry",55],["Eti-Osa",18],["Lagos Island",11]]},
+2025:{land:1559,wet:3270,lga:[["Epe",711],["Ibeju Lekki",657],["Badagry",69],["Eti-Osa",42],["Lagos Island",13]]}};
+const fmt=n=>Math.round(n).toLocaleString('en-GB');
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let year=2025, exposure=null, playing=null;
+
+// ---------- Map ----------
+const map=L.map('map',{preferCanvas:true,zoomSnap:0.25,zoomControl:true,attributionControl:true,minZoom:8,maxZoom:15}).fitBounds([[6.37,2.70],[6.71,4.35]]);
+const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+const base=L.tileLayer(ESRI+'World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,attribution:'Basemap © Esri, HERE, Garmin, © OpenStreetMap contributors'}).addTo(map);
+const ref=L.tileLayer(ESRI+'World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,pane:'shadowPane'}).addTo(map);
+let tilesOk=false,fallback=false;
+base.on('tileload',()=>{tilesOk=true;if(fallback){fallback=false;lgaLayer.setStyle({fillOpacity:0});map.removeLayer(waterLayer);}});
+function useFallback(){if(tilesOk||fallback)return;fallback=true;lgaLayer.setStyle({fillOpacity:.9});waterLayer.addTo(map);}
+base.on('tileerror',useFallback);
+map.createPane('ctx');map.getPane('ctx').style.zIndex=350;map.createPane('wat');map.getPane('wat').style.zIndex=360;
+const lgaLayer=L.geoJSON(null,{pane:'ctx',style:{color:'#7f97a3',weight:1,fill:true,fillColor:'#dfe6e3',fillOpacity:0},
+  onEachFeature:(f,l)=>l.bindTooltip(esc(f.properties.lga||''),{sticky:true})}).addTo(map);
+const waterLayer=L.geoJSON(null,{pane:'wat',style:{stroke:false,fillColor:'#0e3b53',fillOpacity:1},interactive:false});
+const floodLayer=L.geoJSON(null,{style:f=>({stroke:f.properties.type===1,weight:1.5,color:f.properties.type===1?'#00a6d6':'#2f8f5b',fillColor:f.properties.type===1?'#00a6d6':'#2f8f5b',fillOpacity:.95})}).addTo(map);
+let recLayer=null;
+const cache={};
+
+const LAGOS=[[6.37,2.70],[6.71,4.35]];let touched=false;
+const fit=()=>{map.invalidateSize();if(!touched)map.fitBounds(LAGOS,{padding:[6,6]});};
+map.on('mousedown touchstart wheel',()=>{touched=true;});
+fetch('data/lga.geojson').then(r=>r.json()).then(g=>{lgaLayer.addData(g);fit();}).catch(()=>{});
+new ResizeObserver(fit).observe(document.getElementById('map'));
+window.addEventListener('load',()=>setTimeout(fit,300));
+
+fetch('data/water.geojson').then(r=>r.json()).then(g=>waterLayer.addData(g)).catch(()=>{});
+fetch('data/meta.json').then(r=>r.json()).then(m=>{
+  recLayer=L.imageOverlay('data/recurrence_land.png',m.bounds,{opacity:1,zIndex:450});
+  if(document.getElementById('tRec').checked)recLayer.addTo(map);
+}).catch(()=>{});
+
+function loadFlood(y){
+  const go=g=>{if(y!==year)return;floodLayer.clearLayers();
+    g.features.filter(f=>(f.properties.type===1&&tLand.checked)||(f.properties.type===2&&tWet.checked)).forEach(f=>floodLayer.addData(f));
+    floodLayer.eachLayer(l=>l.bindTooltip(`${l.feature.properties.year} · ${esc(l.feature.properties.label)}`,{sticky:true}));};
+  if(cache[y])return go(cache[y]);
+  fetch(`data/flood_${y}.geojson`).then(r=>r.json()).then(g=>{cache[y]=g;go(g);}).catch(()=>{});
+}
+
+// ---------- Panels ----------
+const rail=document.getElementById('rail');
+rail.insertAdjacentHTML('beforeend',YEARS.map(y=>`<button data-y="${y}" aria-pressed="false">${y}</button>`).join(''));
+const maxTot=Math.max(...YEARS.map(y=>STATS[y].land+STATS[y].wet));
+document.getElementById('bars').innerHTML=YEARS.map(y=>{const s=STATS[y];
+  return `<button class="bar" data-y="${y}" aria-pressed="false"><span>${y}</span><span class="track"><i style="width:${s.land/maxTot*100}%;background:var(--land)"></i><i style="width:${s.wet/maxTot*100}%;background:var(--wet)"></i></span><span class="num">${fmt(s.land+s.wet)}</span></button>`}).join('');
+
+function kpis(){
+  const s=STATS[year], landAll=YEARS.map(y=>STATS[y].land);
+  const e=exposure&&exposure.totals[year];
+  document.getElementById('kpis').innerHTML=[
+    [fmt(s.land)+' ha',`flooded land, ${year}`],
+    [fmt(s.wet)+' ha',`wetland & mangrove flooding, ${year}`],
+    [fmt(Math.min(...landAll))+'–'+fmt(Math.max(...landAll))+' ha','yearly range of land flooding, 2017–2025'],
+    e?[fmt(e.pop_land),`people living in flooded land, ${year}`]:['Epe','largest share of flooded land in 7 of 9 years']
+  ].map(([b,t])=>`<div class="kpi"><b>${esc(b)}</b><span>${esc(t)}</span></div>`).join('');
+}
+function lgaTable(){
+  document.getElementById('lgaTitle').textContent=`Where land flooded, ${year}`;
+  let rows=STATS[year].lga;
+  if(exposure&&exposure.byLga[year])rows=exposure.byLga[year].filter(r=>r.land_flood_ha>=1).map(r=>[r.lga,r.land_flood_ha]).slice(0,8);
+  document.getElementById('lgaRows').innerHTML=rows.map(([n,v])=>`<tr><td>${esc(n)}</td><td class="n">${fmt(v)}</td></tr>`).join('');
+}
+function expPanel(){
+  const body=document.getElementById('expBody');
+  document.getElementById('expTitle').textContent=`People and buildings in flooded areas, ${year}`;
+  if(!exposure){body.innerHTML='<p class="note">Exposure figures are not available in this version of the map.</p>';return;}
+  const t=exposure.totals[year];
+  body.innerHTML=`<table><thead><tr><th></th><th class="n">On land</th><th class="n">Wetland</th></tr></thead><tbody>
+    <tr><td>People</td><td class="n">${fmt(t.pop_land)}</td><td class="n">${fmt(t.pop_wetland)}</td></tr>
+    <tr><td>Buildings</td><td class="n">${fmt(t.bldg_land)}</td><td class="n">${fmt(t.bldg_wetland)}</td></tr>
+    <tr><td>Roads, km (approx.)</td><td class="n">${fmt(t.road_km_land)}</td><td class="n">–</td></tr></tbody></table>
+    <p class="note" style="margin-top:8px">${esc(exposure.note)}</p>`;
+}
+function setYear(y){
+  year=y;
+  document.querySelectorAll('[data-y]').forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.y===y)));
+  const rb=rail.querySelector(`[data-y="${y}"]`);if(rb)rb.scrollIntoView({block:'nearest',inline:'nearest'});
+  loadFlood(y);kpis();lgaTable();expPanel();
+  try{history.replaceState(null,'','#y'+y)}catch(e){}
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-y]');if(b){stop();setYear(+b.dataset.y);}});
+const tLand=document.getElementById('tLand'),tWet=document.getElementById('tWet'),tRec=document.getElementById('tRec');
+[tLand,tWet].forEach(c=>c.addEventListener('change',()=>loadFlood(year)));
+tRec.addEventListener('change',()=>{if(!recLayer)return;tRec.checked?recLayer.addTo(map):map.removeLayer(recLayer);});
+const playBtn=document.getElementById('play');
+function stop(){if(playing){clearInterval(playing);playing=null;playBtn.textContent='▶ Play';}}
+playBtn.addEventListener('click',()=>{if(playing)return stop();playBtn.textContent='❚❚ Pause';
+  let i=YEARS.indexOf(year);playing=setInterval(()=>{i=(i+1)%YEARS.length;setYear(YEARS[i]);},1600);});
+document.addEventListener('keydown',e=>{if(e.target.closest('input'))return;const i=YEARS.indexOf(year);
+  if(e.key==='ArrowRight'&&i<YEARS.length-1){stop();setYear(YEARS[i+1]);}if(e.key==='ArrowLeft'&&i>0){stop();setYear(YEARS[i-1]);}});
+
+fetch('data/exposure.json').then(r=>r.ok?r.json():null).then(x=>{if(x){exposure=x;setYear(year);}}).catch(()=>{});
+const h=(location.hash.match(/^#y(\d{4})$/)||[])[1];
+setYear(YEARS.includes(+h)?+h:2025);
+}
+</script>
+</body>
+</html>
